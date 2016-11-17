@@ -7,33 +7,33 @@ from SplitMolecule.split import molecule_from_atoms
 from Matrix import chimera_xform
 
 try:
-    from rdkit.Chem import MolFromPDBBlock, SanitizeMol, SanitizeFlags, FastFindRings
+    from rdkit.Chem import MolFromPDBBlock, FastFindRings
     from rdkit.Chem.rdMolAlign import GetAlignmentTransform, GetO3A
-    from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, AddHs, GetBestRMS
+    from rdkit.Chem.AllChem import MMFFGetMoleculeProperties
 except ImportError:
     raise chimera.UserError("RDKit must be installed to use this extension.")
 
 
-def _chimera_to_rdkit(molecule, ignore_metals=True, sanitize=True):
+def _chimera_to_rdkit(molecule, sanitize=True):
     io = StringIO.StringIO()
     xform = molecule.openState.xform
-    if ignore_metals:
-        non_metals = [a for a in molecule.atoms if not a.element.isMetal]
-        if not non_metals:
-            raise ValueError("Molecule does not contain non-metallic atoms.")
-        molecule = molecule_from_atoms(molecule, non_metals)
-    chimera.pdbWrite([molecule], xform, io)
+    atoms = [a for a in molecule.atoms if not a.element.isMetal and a.element.number > 1]
+    if not atoms:
+        raise ValueError("Molecule does not contain meaningful atoms!")
+    molecule_copy = molecule_from_atoms(molecule, atoms)
+    chimera.pdbWrite([molecule_copy], xform, io)
     io.seek(0)
     rdkit_mol = MolFromPDBBlock(io.getvalue(), False, sanitize)
     io.close()
-    if ignore_metals:
-        molecule.destroy()
+    molecule_copy.destroy()
     return rdkit_mol
+
 
 def _transform_molecule(molecule, xform):
     new_xform = molecule.openState.xform
     new_xform.premultiply(xform)
     molecule.openState.xform = new_xform
+
 
 def align(reference, probe, transform=True, sanitize=True, **kwargs):
     rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
@@ -42,6 +42,7 @@ def align(reference, probe, transform=True, sanitize=True, **kwargs):
     if transform:
         _transform_molecule(probe, chimera_xform(xform[:3]))
     return rmsd
+
 
 def align_o3a(reference, probe, transform=True, sanitize=True, **kwargs):
     rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
@@ -55,6 +56,7 @@ def align_o3a(reference, probe, transform=True, sanitize=True, **kwargs):
     if transform:
         _transform_molecule(probe, chimera_xform(xform[:3]))
     return rmsd
+
 
 def align_best(reference, probe, transform=True, sanitize=True, ignore_warnings=False,
                **kwargs):
@@ -77,6 +79,7 @@ def align_best(reference, probe, transform=True, sanitize=True, ignore_warnings=
     if transform and best_xform is not None:
         _transform_molecule(probe, chimera_xform(best_xform[:3]))
     return best_rmsd
+
 
 def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=True,
               ignore_warnings=False):
@@ -111,3 +114,4 @@ def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=
         avg_rmsd = sum(rmsds)/len(rmsds)
         msg = "Average RMSD for {} molecules is {}".format(len(rmsds), avg_rmsd)
     chimera.statusline.show_message(msg, blankAfter=5)
+
