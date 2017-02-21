@@ -6,9 +6,9 @@ import cStringIO as StringIO
 from SplitMolecule.split import molecule_from_atoms
 from Matrix import chimera_xform
 try:
-    from rdkit.Chem import MolFromPDBBlock, FastFindRings, Conformer
+    from rdkit.Chem import MolFromPDBBlock, FastFindRings
     from rdkit.Chem.rdMolAlign import GetAlignmentTransform, GetO3A, AlignMol
-    from rdkit.Chem.AllChem import MMFFGetMoleculeProperties
+    from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, GetBestRMS
 except ImportError:
     chimera.UserError("RDKit must be installed to use this extension.")
     raise ImportError
@@ -35,6 +35,21 @@ def _transform_molecule(molecule, xform):
     molecule.openState.xform = new_xform
 
 
+def untransformed_rmsd(reference, probe, sanitize=True, ignore_warnings=True, **kwargs):
+    rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
+    rdk_probe = _chimera_to_rdkit(probe, sanitize=sanitize)
+    matches = rdk_reference.GetSubstructMatches(rdk_probe, uniquify=False)
+    if not matches:
+        raise ValueError('Could not find any alignment.')
+    maps = [list(enumerate(match)) for match in matches]
+    best_rmsd = 1000.
+    for atom_map in maps:
+        rmsd = AlignMol(rdk_probe, rdk_reference, atomMap=atom_map, maxIters=0)
+        if rmsd < best_rmsd:
+            best_rmsd = rmsd
+    return best_rmsd
+
+
 def align(reference, probe, transform=True, sanitize=True, **kwargs):
     rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
     rdk_probe = _chimera_to_rdkit(probe, sanitize=sanitize)
@@ -43,12 +58,6 @@ def align(reference, probe, transform=True, sanitize=True, **kwargs):
         _transform_molecule(probe, chimera_xform(xform[:3]))
     return rmsd
 
-
-def untransformed_rmsd(reference, probe, sanitize=True, **kwargs):
-    rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
-    rdk_probe = _chimera_to_rdkit(probe, sanitize=sanitize)
-    return AlignMol(rdk_probe, rdk_reference, maxIters=0)
-    
 
 def align_o3a(reference, probe, transform=True, sanitize=True, **kwargs):
     rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
