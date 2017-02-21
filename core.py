@@ -5,13 +5,13 @@ import chimera
 import cStringIO as StringIO
 from SplitMolecule.split import molecule_from_atoms
 from Matrix import chimera_xform
-
 try:
-    from rdkit.Chem import MolFromPDBBlock, FastFindRings
-    from rdkit.Chem.rdMolAlign import GetAlignmentTransform, GetO3A
+    from rdkit.Chem import MolFromPDBBlock, FastFindRings, Conformer
+    from rdkit.Chem.rdMolAlign import GetAlignmentTransform, GetO3A, AlignMol
     from rdkit.Chem.AllChem import MMFFGetMoleculeProperties
 except ImportError:
-    raise chimera.UserError("RDKit must be installed to use this extension.")
+    chimera.UserError("RDKit must be installed to use this extension.")
+    raise ImportError
 
 
 def _chimera_to_rdkit(molecule, sanitize=True):
@@ -41,7 +41,7 @@ def align(reference, probe, transform=True, sanitize=True, **kwargs):
     rmsd, xform = GetAlignmentTransform(rdk_probe, rdk_reference)
     if transform:
         _transform_molecule(probe, chimera_xform(xform[:3]))
-    return rmsd
+    return rmsd, xform, None
 
 
 def align_o3a(reference, probe, transform=True, sanitize=True, **kwargs):
@@ -55,11 +55,11 @@ def align_o3a(reference, probe, transform=True, sanitize=True, **kwargs):
     rmsd, xform = o3a.Trans()
     if transform:
         _transform_molecule(probe, chimera_xform(xform[:3]))
-    return rmsd
+    return rmsd, xform, None
 
 
 def align_best(reference, probe, transform=True, sanitize=True, ignore_warnings=False,
-               **kwargs):
+               static=False, **kwargs):
     rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
     rdk_probe = _chimera_to_rdkit(probe, sanitize=sanitize)
     matches = rdk_reference.GetSubstructMatches(rdk_probe, uniquify=False)
@@ -69,25 +69,29 @@ def align_best(reference, probe, transform=True, sanitize=True, ignore_warnings=
         raise chimera.UserError("Too many possible alignments found! This can be "
                                 "slow! Use `ignore_warnings true` to try.")
     maps = [list(enumerate(match)) for match in matches]
-    best_rmsd, best_xform = 1000., None
+    best_rmsd, best_xform, best_atom_map = 1000., None, None
     for atom_map in maps:
         rmsd, xform = GetAlignmentTransform(rdk_probe, rdk_reference, atomMap=atom_map)
         if rmsd < best_rmsd:
             best_rmsd = rmsd
             best_xform = xform
+            best_atom_map = atom_map
 
-    if transform and best_xform is not None:
+    if static:
+        best_rmsd = AlignMol(rdk_probe, rdk_reference, atomMap=best_atom_map, maxIters=0)
+    elif transform and best_xform is not None:
         _transform_molecule(probe, chimera_xform(best_xform[:3]))
-    return best_rmsd
+    return best_rmsd, best_xform, best_atom_map
 
 
 def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=True,
               ignore_warnings=False):
-    if method.lower().strip() == 'fast':
+    method = method.lower().strip()
+    if method == 'fast':
         aligner = align
-    elif method.lower().strip() == 'o3a':
+    elif method == 'o3a':
         aligner = align_o3a
-    elif method.lower().strip() == 'best':
+    elif method in ('best', 'static'):
         aligner = align_best
     else:
         raise ValueError('{} is not valid for key `method`'.format(method))
@@ -104,8 +108,9 @@ def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=
     for probe in probes:
         if reference.numAtoms < probe.numAtoms:
             raise chimera.UserError("Reference model should be larger than probe.")
-        rmsd = aligner(reference, probe, transform=transform, sanitize=sanitize,
-                       ignore_warnings=ignore_warnings)
+        rmsd, xform, atom_map = aligner(reference, probe,transform=transform, 
+                                        sanitize=sanitize, ignore_warnings=ignore_warnings,
+                                        static=(method == 'static'))
         rmsds.append(rmsd)
     msg = ""
     if len(rmsds) == 1:
@@ -114,4 +119,4 @@ def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=
         avg_rmsd = sum(rmsds)/len(rmsds)
         msg = "Average RMSD for {} molecules is {}".format(len(rmsds), avg_rmsd)
     chimera.statusline.show_message(msg, blankAfter=5)
-
+    return rmsds
