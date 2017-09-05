@@ -11,7 +11,6 @@ try:
     from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, GetBestRMS
 except ImportError:
     chimera.UserError("RDKit must be installed to use this extension.")
-    raise ImportError
 
 
 def _chimera_to_rdkit(molecule, sanitize=True):
@@ -35,10 +34,11 @@ def _transform_molecule(molecule, xform):
     molecule.openState.xform = new_xform
 
 
-def untransformed_rmsd(reference, probe, sanitize=True, ignore_warnings=True, **kwargs):
+def untransformed_rmsd(reference, probe, sanitize=True, uniquify=False,
+                       ignore_warnings=True, **kwargs):
     rdk_reference = _chimera_to_rdkit(reference, sanitize=sanitize)
     rdk_probe = _chimera_to_rdkit(probe, sanitize=sanitize)
-    matches = rdk_reference.GetSubstructMatches(rdk_probe, uniquify=False)
+    matches = rdk_reference.GetSubstructMatches(rdk_probe, uniquify=uniquify)
     if not matches:
         raise ValueError('Could not find any alignment.')
     maps = [list(enumerate(match)) for match in matches]
