@@ -10,7 +10,7 @@ try:
     from rdkit.Chem.rdMolAlign import GetAlignmentTransform, GetO3A, AlignMol
     from rdkit.Chem.AllChem import MMFFGetMoleculeProperties, GetBestRMS
 except ImportError:
-    chimera.UserError("RDKit must be installed to use this extension.")
+    raise chimera.UserError("RDKit must be installed to use this extension.")
 
 
 def _chimera_to_rdkit(molecule, sanitize=True):
@@ -122,7 +122,7 @@ def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=
     for probe in probes:
         if reference.numAtoms < probe.numAtoms:
             raise chimera.UserError("Reference model should be larger than probe.")
-        rmsd = aligner(reference, probe,transform=transform, 
+        rmsd = aligner(reference, probe,transform=transform,
                                         sanitize=sanitize, ignore_warnings=ignore_warnings)
         rmsds.append(rmsd)
     msg = ""
