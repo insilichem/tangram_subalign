@@ -1,4 +1,4 @@
-# Plume SubAlign
+# Tangram SubAlign
 
 A UCSF Chimera plugin that enables a `subalign` command to align small molecules, even with only partial overlap.
 

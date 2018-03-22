@@ -20,9 +20,9 @@ def read(*filenames, **kwargs):
 long_description = read('README.md')
 
 setup(
-    name='plume_subalign',
+    name='tangram_subalign',
     version='0.0.1',
-    url='https://github.com/insilichem/plume_subalign',
+    url='https://github.com/insilichem/tangram_subalign',
     author='Jaime Rodríguez-Guerra',
     author_email='jaime.rogue@gmail.com',
     description=long_description,
