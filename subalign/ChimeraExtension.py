@@ -27,9 +27,15 @@ from Midas.midas_text import addCommand
 
 def cmd_subalign(cmdName, args):
     from Midas.midas_text import doExtensionFunc
-    from subalign import cmd_align
+    from subalign.core import cmd_align
     doExtensionFunc(cmd_align, args, specInfo=[("refSpec", "reference_sel", None),
                                                ("probeSpec", "probe_sel", None)])
 
+def cmd_subrmsd(cmdName, args):
+    from Midas.midas_text import doExtensionFunc
+    from subalign.core import cmd_rmsd
+    doExtensionFunc(cmd_rmsd, args, specInfo=[("refSpec", "reference_sel", None),
+                                               ("probeSpec", "probe_sel", None)])
 
 addCommand("subalign", cmd_subalign)
+addCommand("subrmsd", cmd_subrmsd)

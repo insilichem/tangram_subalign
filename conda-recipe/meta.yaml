@@ -1,0 +1,37 @@
+{% set name = "tangram_subalign" %}
+
+
+package:
+  name: {{ name|lower }}
+  version: {{ environ.get('GIT_DESCRIBE_TAG', 'v')[1:] }}
+
+source:
+  url: ../
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps -vv"
+
+requirements:
+  host:
+    - python
+  run:
+    - python
+    - pychimera     >=0.2.6
+    - libtangram
+    - rdkit
+
+about:
+  home: http://github.com/insilichem/tangram_subalign
+  license: MIT
+  license_family: MIT
+
+  summary: 'Use RDKit to align small molecules in UCSF Chimera'
+
+  description: |
+    Align two, potentially different, molecules based on partial
+    matches of substructures in UCSF Chimera
+  doc_url: http://tangram-suite.readthedocs.io/en/latest/tangram_subalign.html
+  dev_url: https://github.com/insilichem/tangram_subalign
+
+
