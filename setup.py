@@ -4,6 +4,7 @@
 from setuptools import setup, find_packages
 import os
 import io
+import versioneer
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -21,7 +22,8 @@ long_description = read('README.md')
 
 setup(
     name='tangram_subalign',
-    version='0.0.1',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     url='https://github.com/insilichem/tangram_subalign',
     author='Jaime Rodríguez-Guerra',
     author_email='jaime.rogue@gmail.com',
