@@ -14,6 +14,8 @@ try:
 except ImportError:
     raise chimera.UserError("RDKit must be installed to use this extension.")
 
+import numpy as np
+
 # The RDKit_BondType dictionary is defined to convert float bond orders into RDKit bond types
 RDKit_BondType = {
     1.0 : Chem.BondType.SINGLE,
@@ -34,7 +36,7 @@ def _chimera_to_rdkit(molecule, sanitize=True):
     xform = molecule.openState.xform
     atoms = [a for a in molecule.atoms if not a.element.isMetal and a.element.number > 1]
     if not atoms:
-        raise ValueError("Molecule does not contain meaningful atoms!")
+        raise chimera.UserError("Molecule does not contain meaningful atoms!")
     molecule_copy = molecule_from_atoms(molecule, atoms)
     chimera.pdbWrite([molecule_copy], xform, io)
     io.seek(0)
@@ -93,7 +95,7 @@ def untransformed_rmsd(reference, probe, sanitize=True, uniquify=False,
     else:
         raise chimera.UserError('`method` must be sub, best or o3a')
     if not matches:
-        raise ValueError('Could not find any matches.')
+        raise chimera.UserError('Could not find any matches.')
     maps = [list(enumerate(match)) for match in matches]
     best_rmsd = 1000.
     for atom_map in maps:
@@ -155,19 +157,32 @@ def align_best(reference, probe, transform=True, sanitize=True, ignore_warnings=
     return best_rmsd
 
 
-def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=True,
+def align_com(reference, probe, **kwargs):
+    ref_com = np.average([a.xformCoord() for a in reference.atoms], axis=0)
+    probe_com = np.average([a.xformCoord() for a in probe.atoms], axis=0)
+    translation_v = chimera.Point(*ref_com) - chimera.Point(*probe_com)
+    xform = probe.openState.xform.translation(translation_v)
+    _transform_molecule(probe, xform)
+    return 1000.
+
+
+def cmd_align(reference_sel, probe_sel, methods='best', transform=True, sanitize=True,
               ignore_warnings=False, maxIters=50, reflect=False):
-    method = method.lower().strip()
-    if method == 'fast':
-        aligner = align
-    elif method == 'fixed':
-        aligner = untransformed_rmsd
-    elif method == 'o3a':
-        aligner = align_o3a
-    elif method == 'best':
-        aligner = align_best
-    else:
-        raise ValueError('{} is not valid for key `method`'.format(method))
+    methods = methods.lower().strip().split(',')
+    aligners = []
+    for method in methods:
+        if method.strip() == 'fast':
+            aligners.append(align)
+        elif method.strip() == 'fixed':
+            aligners.append(untransformed_rmsd)
+        elif method.strip() == 'o3a':
+            aligners.append(align_o3a)
+        elif method.strip() == 'best':
+            aligners.append(align_best)
+        elif method.strip() == 'com':
+            aligners.append(align_com)
+        else:
+            raise chimera.UserError('{} is not valid for key `method`'.format(method))
 
     references = reference_sel.molecules()
     probes = probe_sel.molecules()
@@ -181,8 +196,14 @@ def cmd_align(reference_sel, probe_sel, method='best', transform=True, sanitize=
     for probe in probes:
         if reference.numAtoms < probe.numAtoms:
             raise chimera.UserError("Reference model should be larger than probe.")
-        rmsd = aligner(reference, probe,transform=transform, maxIters=maxIters, reflect=reflect,
-                                        sanitize=sanitize, ignore_warnings=ignore_warnings)
+        for aligner in aligners:
+            try:
+                rmsd = aligner(reference, probe, transform=transform, maxIters=maxIters, reflect=reflect,
+                                                 sanitize=sanitize, ignore_warnings=ignore_warnings)
+            except chimera.UserError as e:
+                if aligner is not aligners[-1]:
+                    continue
+                raise e
         rmsds.append(rmsd)
     msg = ""
     if len(rmsds) == 1:
