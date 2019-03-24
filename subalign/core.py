@@ -204,6 +204,8 @@ def cmd_align(reference_sel, probe_sel, methods='best', transform=True, sanitize
                 if aligner is not aligners[-1]:
                     continue
                 raise e
+            else:
+                break
         rmsds.append(rmsd)
     msg = ""
     if len(rmsds) == 1:
